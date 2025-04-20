@@ -1,8 +1,6 @@
 import argparse
 import os
-import subprocess
 from urllib.parse import urlparse
-
 
 from jinja2 import Environment, FileSystemLoader
 from PIL import Image
@@ -12,23 +10,22 @@ from slugify import slugify
 import xmltodict
 
 import logging
-import logging
 
 log_format = "%(message)s"
 logging.basicConfig(level=logging.INFO, format=log_format)
 logger = logging.getLogger(__name__)
 
-
 logger.debug("Initializing Program")
 file_loader = FileSystemLoader('templates')
 env = Environment(loader=file_loader)
 
-parser = argparse.ArgumentParser(description="A little program that downloads and compresses a podcast")
+parser = argparse.ArgumentParser(description="A little program that downloads a podcast")
 parser.add_argument("-v", "--verbose", help="increase output verbosity", action="store_true")
 parser.add_argument("url", help="Podcast RSS URL", type=str)
+parser.add_argument("path", help="Output Path", type=str)
 args = parser.parse_args()
 
-output_dir = os.path.join(os.getcwd(), 'output')
+output_dir = args.path #s.path.join(os.getcwd(), 'output')
 
 podcast = {}
 
@@ -38,9 +35,9 @@ def download_audio_files():
         download_audio_file(episode)
 
 def download_audio_file(episode):
-    logger.debug('          Downloading episode file')
     file_path = os.path.join(output_dir, podcast['rss']['channel']['slug'], 'audio', episode['file_name'])
     if not os.path.exists(file_path):
+        logger.debug('          Downloading ' + episode['title'])
         r = requests.get(episode['enclosure']['@url'], allow_redirects=True)
         open(file_path, 'wb').write(r.content)
 
@@ -59,8 +56,6 @@ def download_and_resize_cover_image():
     img.save(cover_art_path)
     img.thumbnail((1000, 1000))
     img.save(small_cover_art_path, optimize=True)
-
-
 
 def make_slugs():
     logger.debug('  Making slugs')
@@ -90,8 +85,6 @@ def process_episodes():
             item['file_name'] = os.path.basename(url_path)
             podcast['episodes'].append(item)
 
-
-
 def process_podcast(url):
     logger.info('Processing podcast with URL: ' + url) 
     global podcast
@@ -107,7 +100,6 @@ def process_podcast(url):
     render_front_page()
     render_episodes()
     save_feed(r.content)
-    compress_output()
 
 
 def render_front_page():
@@ -124,7 +116,7 @@ def render_episodes():
         render_episode(episode)
 
 def render_episode(episode):
-    logger.debug('          Rendering episode page')
+    # logger.debug('          Rendering episode page')
     episode_dir = os.path.join(output_dir, podcast['rss']['channel']['slug'], 'episode', episode['slug'])
     if not os.path.exists(episode_dir):
         os.makedirs(episode_dir)
@@ -142,20 +134,7 @@ def save_feed(content):
     file_path = os.path.join(output_dir, podcast['rss']['channel']['slug'], "rss.xml")
     open(file_path, 'wb').write(content)
 
-
-def compress_output():
-    return
-    logger.debug('  Compressing podccast')
-    target_dir = file_path = os.path.join(podcast['rss']['channel']['slug'])
-    file_name = podcast['rss']['channel']['slug'] + '.tar.gz'
-    file_path = os.path.join(output_dir, file_name)
-    subprocess.call(['tar', '-C', output_dir, '-czf', file_name, target_dir], cwd=output_dir)
-
-
 if __name__ == "__main__":
     if args.verbose:
         logger.setLevel(logging.DEBUG)
     process_podcast(args.url)
-
-
-
